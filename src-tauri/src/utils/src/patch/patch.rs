@@ -10,6 +10,7 @@ use log::warn;
 use memmap2::Mmap;
 use memmap2::MmapMut;
 use pelite::PeFile;
+use core::option::Option::Some;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -19,7 +20,7 @@ pub struct UPatch {
     file: String,
     save: String,
     with_write: bool,
-    sections: Vec<(u64, u64, u64)>,
+    sections: Option<Vec<(u64, u64, u64)>>,
 }
 
 impl UPatch {
@@ -46,7 +47,11 @@ impl UPatch {
     }
 
     pub fn new(data: PatchDataType, file: &str, save: &str, with_write: bool) -> Result<Self> {
-        let sections = Self::init_sections(&data)?;
+        let sections = if let Ok(secs) = Self::init_sections(&data){
+            Some(secs)
+        }else{
+            None
+        };
         Ok(Self {
             data,
             file: file.to_string(),
@@ -173,23 +178,24 @@ impl UPatch {
 
     pub fn foa_to_rva(&self, foa: u64) -> Result<u64> {
         let sections = &self.sections;
-        for section in sections {
-            let section_start = section.0;
-            let section_end = section.1;
-            let v_address = section.2;
-            // 处理未映射到节的数据（如PE头）
-            if foa < section_start {
-                return Ok(foa);
-            }
-            // 检查 FOA 是否在当前节内
-            if foa >= section_start && foa < section_end {
-                // 计算节内偏移
-                let offset_in_section = foa - section_start;
-                // 转换为 RVA: 节起始RVA + 节内偏移
-                return Ok(v_address + offset_in_section);
+        if let Some(sections) = sections {
+            for section in sections {
+                let section_start = section.0;
+                let section_end = section.1;
+                let v_address = section.2;
+                // 处理未映射到节的数据（如PE头）
+                if foa < section_start {
+                    return Ok(foa);
+                }
+                // 检查 FOA 是否在当前节内
+                if foa >= section_start && foa < section_end {
+                    // 计算节内偏移
+                    let offset_in_section = foa - section_start;
+                    // 转换为 RVA: 节起始RVA + 节内偏移
+                    return Ok(v_address + offset_in_section);
+                }
             }
         }
-
         Err(UPatchError::FOAToRVAError.into())
     }
 
@@ -225,6 +231,7 @@ impl UPatch {
             // 跳过保存
             return Ok(());
         }
+
         match self.file.as_str() == self.save.as_str() {
             true => self.save_to(),
             false => self.save_as(),

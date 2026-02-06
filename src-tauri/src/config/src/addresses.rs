@@ -36,7 +36,11 @@ impl Addresses {
                 Ok(orignal) => {
                     debug!("地址：{}， 原始补丁：{:?}", pos, orignal);
                     debug!("地址：{}， 替换补丁：{:?}", pos, replace);
-                    let start_rva = upatch.foa_to_rva(pos as u64)? as usize;
+                    let start_rva = if let Ok(rva) = upatch.foa_to_rva(pos as u64) {
+                        rva as usize
+                    } else {
+                        0
+                    };
                     addresses.push(Address::new(
                         orignal,
                         replace.to_string(),

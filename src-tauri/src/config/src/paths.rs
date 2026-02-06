@@ -199,14 +199,16 @@ impl Method {
     fn get_path_by_readfile(&mut self) -> Result<String> {
         let path = self.get_required_arg(PATH_CODE)?;
         trace!("get_path_by_readfile path:{:?}", path);
-        let value = self.get_required_arg(VALUE_CODE)?;
+        let field = self.get_required_arg(FIELD_CODE)?;
+        trace!("get_path_by_readfile field:{:?}", field);
+        let value = self.get_required_arg(VALUE_CODE)?.parse::<usize>()?;
         trace!("get_path_by_readfile value:{:?}", value);
-        let re = Regex::new(&value)
-            .map_err(|_| ConfigError::InvalidPatternReplace(value.to_string()))?;
+        let re = Regex::new(&field)
+            .map_err(|_| ConfigError::InvalidPatternReplace(field.to_string()))?;
         let data = std::fs::read_to_string(&path)?;
         let result = re.captures(&data);
         if let Some(caps) = result {
-            let result = caps.get(1).map(|m| m.as_str().to_string());
+            let result = caps.get(value).map(|m| m.as_str().to_string());
             if let Some(result) = result {
                 trace!("get_path_by_readfile value  captures get:{:?}", result);
                 let value = self.fix.run(result)?;

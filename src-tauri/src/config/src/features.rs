@@ -109,6 +109,10 @@ impl Features {
         self.0.extend(features.0);
         self.sort_by_key();
     }
+
+    pub fn check_other_patch_feature_open(&self,code: &str) -> bool {
+        self.0.iter().any(|f| f.method.as_str() == "patch" && f.status && f.code.as_str() != code)
+    }
 }
 
 impl std::fmt::Debug for Features {
@@ -204,6 +208,9 @@ pub struct Feature {
     #[serde(default)]
     #[serde(skip_serializing_if = "skip_if_empty")]
     pub dependpatches: Vec<String>, // 补丁依赖
+    #[serde(default)]
+    #[serde(skip_serializing_if = "skip_if_empty")]
+    pub extpatches: Vec<String>, // 额外补丁依赖
     #[serde(default)]
     #[serde(skip_serializing_if = "skip_if_empty")]
     pub dependfeatures: Vec<String>, // 前置功能

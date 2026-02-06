@@ -1,5 +1,6 @@
 use crate::errors::Result;
 use crate::types::wstr::WSTR;
+use log::trace;
 use thiserror::Error;
 use windows::Win32::Storage::FileSystem::GetFileAttributesExW;
 use windows::Win32::Storage::FileSystem::GetFileVersionInfoSizeW;
@@ -46,6 +47,7 @@ impl FileInfo {
         let mut dummy = 0;
         let info_size = unsafe { GetFileVersionInfoSizeW(lpname.to_pcwstr(), Some(&mut dummy)) };
         if info_size == 0 {
+            trace!("{:?} get_version GetFileVersionInfoSizeW error: {:?}", self.path, info_size);
             return Err(FileInfoError::GetFileInfoError.into());
         }
         // 第二步：分配缓冲区并获取版本信息
@@ -58,7 +60,10 @@ impl FileInfo {
                 buffer.as_mut_ptr() as *mut _,
             )
         }
-        .map_err(|_| FileInfoError::GetFileInfoError)?;
+        .map_err(|e| {
+            trace!("{:?} get_version GetFileVersionInfoW error: {:?}", self.path, e);
+            FileInfoError::GetFileInfoError
+           })?;
         // 第三步：查询固定文件信息
         let mut fixed_info_ptr = std::ptr::null_mut();
         let mut fixed_info_len = 0;
@@ -71,6 +76,7 @@ impl FileInfo {
             )
         };
         if success != BOOL(1) {
+            trace!("{:?} get_version VerQueryValueW error: {:?}", self.path, success);
             return Err(FileInfoError::GetFileInfoError.into());
         }
         // 第四步：提取版本号

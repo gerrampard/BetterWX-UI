@@ -43,6 +43,9 @@ pub struct Rule {
     pub version: String,
     pub patches: Patches,
     #[serde(default)]
+    #[serde(skip_serializing_if = "skip_if_empty")]
+    pub extpatches: Vec<String>, // 全局额外补丁依赖
+    #[serde(default)]
     pub rtype: RuleType,
     #[serde(default)]
     #[serde(skip_serializing_if = "skip_if_empty")]
@@ -294,7 +297,7 @@ impl Rule {
         rule.name = name;
         rule.index = num;
         rule.ismain = ismain;
-        rule.installed = false;
+        rule.installed = false; 
         // 变量 后续不需要使用了
         rule.variables.clear();
         Ok(rule)
@@ -329,8 +332,9 @@ impl Rule {
         let feature = self.features.get(fcode)?.clone();
         let name = feature.get_name().to_string();
         info!("正在执行 {} 补丁", name.as_str());
-        let use_backfile = fcode == COEXISTS_CODE;
-
+        let use_backfile = fcode == COEXISTS_CODE; 
+        // 判断是否 不是主程序, 是制作共存程序 。或者 其他 补丁功能已经开启
+        let is_patch_ext = !self.ismain || use_backfile || status || self.features.check_other_patch_feature_open(fcode);
         if save {
             // 递归前检查
             self.patches.check_files_and_del(true, use_backfile)?;
@@ -355,8 +359,24 @@ impl Rule {
                 self.patch(code, false, Some(cache))?;
             }
         }
+
+        
+        info!("执行全局额外补丁功能 status = {}", is_patch_ext);
+        // 执行全局额外补丁功能, 忽略错误
+        let _ = self.patches.patch_rule_extpatches(cache, &feature, &self.extpatches, is_patch_ext).map_err(|e|{
+            error!("执行 全局 额外补丁功能失败，{}", e);
+        });
+
+        info!("执行补丁功能 status = {}", is_patch_ext);
         // 执行补丁功能
         self.patches.patch(cache, &feature, status)?;
+
+        info!("执行额外补丁功能 status = {}", is_patch_ext);
+        // 执行额外补丁功能, 忽略错误
+        let _ = self.patches.patch_extpatches(cache, &feature, is_patch_ext).map_err(|e|{
+            error!("执行 {} 额外补丁功能失败，{}", feature.get_name(), e);
+        });
+       
 
         self.features.get_mut(fcode)?.status = status;
 

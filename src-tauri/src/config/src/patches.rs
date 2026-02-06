@@ -18,12 +18,14 @@ use macros::ImpConfigVecIsEmptyTrait;
 use macros::ImpConfigVecWrapperTrait;
 use serde::Deserialize;
 use serde::Serialize;
+use utils::file::del_directory;
 use std::fmt::Debug;
 use std::path::Path;
 use utils::empty::Empty;
 use utils::file::back_file;
 use utils::file::file_is_equal;
 use utils::file::remove_file;
+use utils::file::copy_directory;
 use utils::patch::patch::UPatch;
 
 #[derive(
@@ -78,18 +80,43 @@ impl Patches {
     }
 
     pub fn patch(&mut self, data_cache: &mut Cache, feature: &Feature, status: bool) -> Result<()> {
+        // 制作共存时强制使用 backfile ，否则强制使用 save_file
+        let use_backfile = feature.code.as_str() == COEXISTS_CODE;
         for code in &feature.dependpatches {
             let patch = self.find_mut_patch_by_pattern_code(code.as_str())?;
-
-            // 制作共存时强制使用 backfile ，否则强制使用 save_file
-            let use_backfile = feature.code.as_str() == COEXISTS_CODE;
             let upatch = Self::build_upatch(patch, data_cache, use_backfile, &feature.code, true)?;
             patch.patch(upatch, code, status)?;
         }
         Ok(())
     }
 
-      pub fn patch_by_replace(&mut self, data_cache: &mut Cache, feature: &Feature, ovs: &OrignalViews) -> Result<()> {
+    pub fn patch_extpatches(&mut self, data_cache: &mut Cache, feature: &Feature, status: bool) -> Result<()> {
+        // 制作共存时强制使用 backfile ，否则强制使用 save_file
+        let use_backfile = feature.code.as_str() == COEXISTS_CODE;
+        // 处理附加补丁
+        for code in &feature.extpatches {
+            let patch = self.find_mut_patch_by_pattern_code(code.as_str())?;
+            let upatch = Self::build_upatch(patch, data_cache, use_backfile, &feature.code, true)?;
+            
+            patch.patch(upatch, code, status)?;
+        }
+        Ok(())
+    }
+
+    pub fn patch_rule_extpatches(&mut self, data_cache: &mut Cache, feature: &Feature, extpatches: &Vec<String>, status: bool) -> Result<()> {
+        // 制作共存时强制使用 backfile ，否则强制使用 save_file
+        let use_backfile = feature.code.as_str() == COEXISTS_CODE;
+        // 处理 全局 附加补丁
+        for code in extpatches {
+            let patch = self.find_mut_patch_by_pattern_code(code.as_str())?;
+            let upatch = Self::build_upatch(patch, data_cache, use_backfile, &feature.code, true)?;
+            
+            patch.patch(upatch, code, status)?;
+        }
+        Ok(())
+    }
+
+    pub fn patch_by_replace(&mut self, data_cache: &mut Cache, feature: &Feature, ovs: &OrignalViews) -> Result<()> {
         for ov in &ovs.0 {
             let patch = self.find_mut_patch_by_pattern_code(&ov.pcode)?;
 
@@ -128,14 +155,24 @@ impl Patches {
             }
         });
         if let Some(e) = last_error {
+            debug!("检查文件失败：{}", e);
             self.del_files()?;
             return Err(e);
         }
         Ok(())
     }
 
+    pub fn copy_directory(&self) -> Result<()> {
+        for patch in &self.0 {
+            patch.copy_directory()?;
+        }
+        Ok(())
+    }
+
     pub fn del_files(&self) -> Result<()> {
         for patch in &self.0 {
+            // 删除拷贝的目录
+            patch.del_directory()?;
             patch.del_file()?;
         }
         Ok(())
@@ -247,6 +284,15 @@ pub struct Patch {
     pub basefile: String,
     #[serde(default)]
     #[serde(skip_serializing_if = "skip_if_empty")]
+    pub copy_files: bool,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "skip_if_empty")]
+    pub copy_from_directory: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "skip_if_empty")]
+    pub copy_to_directory: String,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "skip_if_empty")]
     pub patterns: Patterns,
     #[serde(default)]
     #[serde(skip_serializing_if = "skip_if_empty")]
@@ -268,10 +314,13 @@ impl Patch {
         self.patterns.init(variables)?;
         // 传入 num 构建文件路径
         if let Ok(_) = variables.get_num() {
+            self.savefile = variables.fix_main_target(self.savefile.as_str());
+
             self.backfile = variables.substitute(self.backfile.as_str());
             self.basefile = variables.substitute(self.basefile.as_str());
-            self.savefile = variables.fix_main_target(self.savefile.as_str());
             self.savefile = variables.substitute(self.savefile.as_str());
+            self.copy_from_directory = variables.substitute(self.copy_from_directory.as_str());
+            self.copy_to_directory = variables.substitute(self.copy_to_directory.as_str());
         }
         Ok(())
     }
@@ -338,6 +387,27 @@ impl Patch {
         Ok(())
     }
 
+    pub fn copy_directory(&self) -> Result<()> {
+        let copy_files = self.get_copy_files();
+        let copy_from_directory = self.get_copy_from_directory();
+        let copy_to_directory = self.get_copy_to_directory();
+        if copy_files{
+            debug!("拷贝文件夹: {:?}", self);
+            copy_directory(copy_from_directory, copy_to_directory)?;
+        }
+        Ok(())
+    }
+
+    pub fn del_directory(&self) -> Result<()> {
+        let copy_files = self.get_copy_files();
+        let copy_to_directory = self.get_copy_to_directory();
+        if copy_files{
+            debug!("删除文件夹: {:?}", self);
+            let _ = del_directory(copy_to_directory);
+        }
+        Ok(())
+    }
+
     pub fn del_file(&self) -> Result<()> {
         let savefile = self.get_savefile();
         remove_file(savefile)?;
@@ -348,6 +418,18 @@ impl Patch {
 impl Patch {
     pub fn get_savefile(&self) -> &str {
         self.savefile.as_str()
+    }
+
+    pub fn get_copy_files(&self) -> bool {
+        self.copy_files
+    }
+
+    pub fn get_copy_from_directory(&self) -> &str {
+        self.copy_from_directory.as_str()
+    }
+
+    pub fn get_copy_to_directory(&self) -> &str {
+        self.copy_to_directory.as_str()
     }
 
     pub fn get_basefile(&self) -> &str {

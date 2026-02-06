@@ -263,8 +263,9 @@ impl TryFrom<&Patches> for Variables {
             for pattern in &patch.patterns.0 {
                 for address in &pattern.addresses.0 {
                     let add = address.start_rva;
+                    // 过滤无效的 rva 地址
                     if add <= 0 {
-                        return Err(ConfigError::InvalidAddress);
+                        continue;
                     }
                     let v = VariableValue::Usize(add);
                     let variable = Variable::new(pattern.code.clone(), v);

@@ -112,6 +112,8 @@ pub async fn rule_make_coexist(code: &str, num: usize) -> Result<FileView> {
     rule_config_fn(|config| {
         let rule = config.rules.get_mut(code)?;
         let mut new_rule = rule.build_by_num(num)?;
+        // 拷贝文件夹
+        new_rule.patches.copy_directory()?;
         new_rule.patch(COEXISTS_CODE, true, None)?;
         new_rule.features.retain_features(num == 0);
         let files = config.files.get_mut(code)?;

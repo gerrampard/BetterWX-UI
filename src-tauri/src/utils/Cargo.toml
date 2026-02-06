@@ -18,3 +18,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 known-folders = { workspace = true }
 pelite = { workspace = true }
+fs_extra = { workspace = true }
