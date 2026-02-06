@@ -85,11 +85,18 @@ pub fn file_is_equal(from: &str, to: &str) -> Result<bool> {
     }
     let from_file = &FileInfo::new(from);
     let to_file = &FileInfo::new(to);
-    // 修改为使用文件大小比较
-    file_is_equal_by_size(from_file, to_file)
+    match file_is_equal_by_version(from_file,to_file) {
+        Ok(is_equal) => {
+            match is_equal {
+                true => file_is_equal_by_size(from_file, to_file),
+                false => Ok(false),
+            }
+        },
+        Err(_) => file_is_equal_by_size(from_file, to_file),
+    }
 }
 
-fn _file_is_equal_by_version(from: &FileInfo, to: &FileInfo) -> Result<bool> {
+fn file_is_equal_by_version(from: &FileInfo, to: &FileInfo) -> Result<bool> {
     let from_ver = Version::new(from.get_version()?.as_str());
     let to_ver = Version::new(to.get_version()?.as_str());
     let from_size = from.get_size()?;
