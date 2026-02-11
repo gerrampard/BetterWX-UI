@@ -38,7 +38,7 @@ pub async fn config_check(config: &VerData) -> Result<ConfigViews> {
     } else {
         let store = Store::new(&format!("config"))?;
         let password = config.version.to_string();
-        match store.get_by_version(config.version.clone()) {
+        match store.get_by_version(config.version.as_str()) {
             Ok(data) => {
                 info!("正在使用本地配置文件：v{}", password);
                 data
@@ -67,7 +67,7 @@ pub async fn readme_check(readme: &VerData) -> Result<String> {
     }
     let store = Store::new(&format!("readme"))?;
     let password = readme.version.to_string();
-    let data = match store.get_by_version(readme.version.clone()) {
+    let data = match store.get_by_version(readme.version.as_str()) {
         Ok(data) => {
             info!("正在使用本地说明文档：v{}", password);
             data

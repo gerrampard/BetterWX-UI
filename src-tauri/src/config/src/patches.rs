@@ -11,6 +11,7 @@ use crate::serders::skippers::skip_if_empty;
 use crate::variables::Variables;
 use log::debug;
 use log::error;
+use log::info;
 use log::trace;
 use macros::FieldDescGetters;
 use macros::FieldNameGetters;
@@ -19,6 +20,7 @@ use macros::ImpConfigVecWrapperTrait;
 use serde::Deserialize;
 use serde::Serialize;
 use utils::file::del_directory;
+use utils::store::StoreData;
 use std::fmt::Debug;
 use std::path::Path;
 use utils::empty::Empty;
@@ -27,6 +29,7 @@ use utils::file::file_is_equal;
 use utils::file::remove_file;
 use utils::file::copy_directory;
 use utils::patch::patch::UPatch;
+use utils::store::Store;
 
 #[derive(
     Clone, Serialize, Deserialize, Default, ImpConfigVecIsEmptyTrait, ImpConfigVecWrapperTrait,
@@ -56,7 +59,16 @@ impl Patches {
         Ok(())
     }
 
-    pub fn search(&mut self, data_cache: &mut Cache, name: &str) -> Result<()> {
+    pub fn search(&mut self, data_cache: &mut Cache, name: &str,code: &str,version: &str) -> Result<()> {
+        let store_patches = match self.read_store_patches(code, version) {
+            Ok(patches) =>{
+                if patches.is_supported() { Some(patches) } else { None  }
+            },
+            Err(_) => {
+                info!("缓存补丁基址失效");
+                None
+            }
+        };
         let all_bak_files = self
             .0
             .iter()
@@ -64,7 +76,17 @@ impl Patches {
             .collect::<Vec<String>>();
         for patch in &mut self.0 {
             let upatch = Self::build_upatch(patch, data_cache, true, "搜索基址", false)?;
-            if let Err(e) = patch.search(&upatch) {
+            // 检测缓存是否可用
+            if let Some(store_patches) = &store_patches {
+                let store_patch = store_patches.find(&patch.code);
+                if let Some(store_patch) = store_patch {
+                    if store_patch.is_supported() {
+                        patch.patterns = store_patch.patterns.clone();
+                        continue;
+                    }
+                }
+            }
+            if let Err(e) = patch.search(&upatch) { 
                 error!("搜索基址失败：{}", e);
                 for file in all_bak_files {
                     remove_file(file.as_str())?;
@@ -76,6 +98,35 @@ impl Patches {
                 .into());
             };
         }
+        self.write_store_patches(code, version)?;
+        Ok(())
+    }
+
+    pub fn read_store_patches(&self,file_name: &str,version: &str)-> Result<Patches> {
+        info!("正在检测 {} 基址缓存...", file_name);
+        let store = Store::new(file_name)?;
+        let data = store.get_by_version(version)?;
+        let patches: Patches = serde_json::from_str(&data).map_err(|_| ConfigError::CachePacthecInvalidError)?;
+        Ok(patches)
+    }
+
+    pub fn write_store_patches(&self,file_name: &str,version: &str)-> Result<()> {
+        info!("正在写入 {} 基址缓存...", file_name);
+        let parches_string = if self.is_supported() {
+            // 写入补丁数据
+            serde_json::to_string(&self).map_err(|_| ConfigError::WritePacthecCacheError)?
+        } else {
+            // 清空缓存
+            "".to_string()
+        };
+        let store = Store::new(file_name)?;
+        let data = StoreData {
+            data: parches_string,
+            version: version.into(),
+            encoded: false,
+        };
+        store.save(data)?;
+       
         Ok(())
     }
 

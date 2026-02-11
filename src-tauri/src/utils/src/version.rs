@@ -37,6 +37,10 @@ impl Version {
     pub fn strict_eq(&self, other: &Self) -> bool {
         self.version == other.version
     }
+
+    pub fn as_str(&self) -> &str {
+        self.version.as_str()
+    }
 }
 
 impl PartialEq for Version {

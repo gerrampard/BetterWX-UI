@@ -117,9 +117,8 @@ impl Rule {
         rule.patches.back_files()?;
 
         rule.patches.check_files_and_del(true, true)?;
-
         let mut cache = Cache::new();
-        rule.patches.search(&mut cache, self.get_name())?;
+        rule.patches.search(&mut cache, self.get_name(), &rule.code, &rule.version)?;
         self.patches.clone_pattern(&rule.patches)?;
         let pvariables = Variables::try_from(&self.patches)?;
         self.variables.extend(pvariables);

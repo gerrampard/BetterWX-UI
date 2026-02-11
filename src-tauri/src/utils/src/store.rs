@@ -1,6 +1,5 @@
 use crate::base64::Base64;
 use crate::errors::Result;
-use crate::version::Version;
 use known_folders::KnownFolder;
 use known_folders::get_known_folder_path;
 use log::error;
@@ -74,8 +73,7 @@ impl Store {
         Ok(decode_text)
     }
 
-    pub fn get_by_version<V: Into<Version>>(&self, version: V) -> Result<String> {
-        let version = version.into();
+    pub fn get_by_version(&self, version: &str) -> Result<String> {
         let data = self.data.read().map_err(|_| StoreError::LockPoisoned)?;
         if data.version != version {
             return Err(StoreError::VersionError.into());
@@ -105,13 +103,13 @@ impl Store {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct StoreData {
-    pub version: Version,
+    pub version: String,
     pub data: String,
     pub encoded: bool,
 }
 
 impl StoreData {
-    pub fn new<V: Into<Version>>(version: V, data: &str, encoded: bool) -> Self {
+    pub fn new(version: &str, data: &str, encoded: bool) -> Self {
         Self {
             version: version.into(),
             data: data.to_string(),

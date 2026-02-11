@@ -118,6 +118,13 @@ pub enum ConfigError {
     #[error("CacheLockError")]
     CacheLockError,
 
+    #[error("写入补丁基址缓存失败")]
+    WritePacthecCacheError,
+
+    
+    #[error("缓存补丁基址失效")]
+    CachePacthecInvalidError,
+
     #[error(transparent)]
     IoError(#[from] std::io::Error),
 
