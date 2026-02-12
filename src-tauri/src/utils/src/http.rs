@@ -53,7 +53,7 @@ impl Http {
                 .timeout(Duration::from_secs(30))
                 .user_agent(USER_AGENT)
                 .build()
-                .map_err(|e|{
+                .map_err(|e| {
                     error!("创建http客户端失败:{}", e);
                     HttpError::RequestError
                 })?,
@@ -64,8 +64,9 @@ impl Http {
     fn fix_url(&self, url: &str) -> String {
         if !url.starts_with(HTTPS_PREFIX) && !url.starts_with(HTTP_PREFIX) {
             let base = setting::BASE_URL.trim_end_matches('/');
+            let cargo = setting::CARGO_URL.trim_end_matches('/');
             let path = url.trim_start_matches('/');
-            return format!("{}/{}", base, path);
+            return format!("{}/{}/{}", base, cargo, path);
         }
         return url.to_string();
     }
@@ -87,13 +88,10 @@ impl Http {
             return Err(HttpError::RequestStatusError(response.status().to_string()).into());
         }
 
-        let r = response
-            .text()
-            .await
-            .map_err(|e| {
-                error!("请求失败:{}", e);
-                HttpError::RequestError
-            })?;
+        let r = response.text().await.map_err(|e| {
+            error!("请求失败:{}", e);
+            HttpError::RequestError
+        })?;
         if let Some(passwrd) = self.passwrd.as_ref() {
             let base64 = Base64::new(passwrd.as_str());
             if let Ok(base64) = base64 {

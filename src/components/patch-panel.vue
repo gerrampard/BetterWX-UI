@@ -306,12 +306,16 @@ async function set_note() {
         showToast("缓存文件名无效")
         return
     }
-    let notes_str = await storeApis.store_read(note_store_key.value)
-    if (!notes_str) {
-        return
+    try {
+        let notes_str = await storeApis.store_read(note_store_key.value)
+        if (!notes_str) {
+            return
+        }
+        notes.value = JSON.parse(notes_str)
+        return notes.value
+    } catch (_) {
+        console.log(`${note_store_key.value} 未配置备注`);
     }
-    notes.value = JSON.parse(notes_str)
-    return notes.value
 }
 
 async function note(data) {
