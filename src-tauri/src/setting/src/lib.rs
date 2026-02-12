@@ -2,7 +2,7 @@ pub const MAIN_PKG_NAME: &str = "BetterWX-UI";
 
 pub const MAIN_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-pub const DEBUG_MODEL: bool = false; //cfg!(debug_assertions);
+pub const DEBUG_MODEL: bool = cfg!(debug_assertions);
 
 pub const DEBUG_BASE_PATH: &str = r"D:\workspace\release\BetterWx-UI\BetterWX-UI-3-Config";
 
