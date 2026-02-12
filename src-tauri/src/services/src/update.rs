@@ -7,7 +7,6 @@ use config::update::VerData;
 use config::views::config_view::ConfigViews;
 use log::debug;
 use log::info;
-use setting::BASE_URL;
 use setting::DEBUG_BASE_PATH;
 use setting::DEBUG_CONFIG_NAME;
 use setting::DEBUG_README_NAME;
@@ -25,7 +24,6 @@ pub async fn update_check() -> Result<Update> {
         get_debug_data(DEBUG_UPDATE_NAME)?
     } else {
         let http = Http::new(Some(MAIN_PKG_NAME.to_string()))?;
-        let _ = http.fetch(BASE_URL).await;
         let data = http.fetch(UPDATE_URL).await?;
         data.get_data()
     };
