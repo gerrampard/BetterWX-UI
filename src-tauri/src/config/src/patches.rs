@@ -103,7 +103,7 @@ impl Patches {
     }
 
     pub fn read_store_patches(&self,file_name: &str,version: &str)-> Result<Patches> {
-        info!("正在检测 {} 基址缓存...", file_name);
+        info!("正在检测 {} 基址缓存，版本：{}...", file_name, version);
         let store = Store::new(file_name)?;
         let data = store.get_by_version(version)?;
         let patches: Patches = serde_json::from_str(&data).map_err(|_| ConfigError::CachePacthecInvalidError)?;
@@ -111,7 +111,7 @@ impl Patches {
     }
 
     pub fn write_store_patches(&self,file_name: &str,version: &str)-> Result<()> {
-        info!("正在写入 {} 基址缓存...", file_name);
+        info!("正在写入 {} 基址缓存，版本：{}...", file_name, version);
         let parches_string = if self.is_supported() {
             // 写入补丁数据
             serde_json::to_string(&self).map_err(|_| ConfigError::WritePacthecCacheError)?
